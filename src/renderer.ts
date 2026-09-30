@@ -1,86 +1,98 @@
 // 渲染进程：UI 事件绑定 + 视图切换 + 音效触发
-// 依赖：window.timerAPI（preload 暴露）、AudioPlayer（audio.js）、HiitTimer（timer.js）
+// 依赖：window.timerAPI（preload 暴露）、AudioPlayer（audio.ts）、HiitTimer（timer.ts）、ConfigStore（storage.ts）
 
-const FIELDS = [
-  { key: 'warmup',     step: 5, min: 0, max: 600 },
-  { key: 'work',       step: 5, min: 1, max: 600 },
-  { key: 'rest',       step: 5, min: 0, max: 600 },
-  { key: 'betweenSets',step: 5, min: 0, max: 600 },
-  { key: 'stretch',    step: 5, min: 0, max: 600 },
-  { key: 'sets',       step: 1, min: 1, max: 50 },
-  { key: 'repsPerSet', step: 1, min: 1, max: 100 }
+const FIELDS: ReadonlyArray<{ key: keyof TimerConfig; step: number; min: number; max: number }> = [
+  { key: 'warmup',      step: 5, min: 0, max: 600 },
+  { key: 'work',        step: 5, min: 1, max: 600 },
+  { key: 'rest',        step: 5, min: 0, max: 600 },
+  { key: 'betweenSets', step: 5, min: 0, max: 600 },
+  { key: 'stretch',     step: 5, min: 0, max: 600 },
+  { key: 'sets',        step: 1, min: 1, max: 50 },
+  { key: 'repsPerSet',  step: 1, min: 1, max: 100 }
 ];
 
-const STATE_LABELS_CN = {
+const STATE_LABELS_CN: Record<TimerState, string> = {
   idle: '准备', warmup: '热身', work: '锻炼', rest: '休息',
   between_sets: '组间间隔', stretch: '拉伸', done: '完成'
 };
 
-const STATE_LABELS_EN = {
+const STATE_LABELS_EN: Record<TimerState, string> = {
   idle: 'READY', warmup: 'WARM UP', work: 'WORK', rest: 'REST',
   between_sets: 'BREAK', stretch: 'STRETCH', done: 'DONE'
 };
 
-const ALL_STATES = ['idle', 'warmup', 'work', 'rest', 'between_sets', 'stretch', 'done'];
+const ALL_STATES: readonly TimerState[] = ['idle', 'warmup', 'work', 'rest', 'between_sets', 'stretch', 'done'];
 
 const RING_CIRCUMFERENCE = 2 * Math.PI * 128; // r=128，匹配 v2 环形尺寸
 
 const audio = new AudioPlayer();
 const timer = new HiitTimer();
 
-let config = {};
+// 读取必需的 DOM 元素。缺失即说明 index.html 与脚本不同步，直接抛错而不是静默跳过。
+function mustGet<T extends HTMLElement = HTMLElement>(id: string): T {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`缺少必需的 DOM 元素: #${id}`);
+  return el as T;
+}
 
-const $ = (id) => document.getElementById(id);
+function mustQuery<T extends Element = Element>(selector: string): T {
+  const el = document.querySelector(selector);
+  if (!el) throw new Error(`缺少必需的 DOM 元素: ${selector}`);
+  return el as T;
+}
 
 const els = {
-  viewConfig: $('view-config'),
-  viewTrain: $('view-train'),
-  form: $('config-form'),
-  stageLabel: $('stage-label'),
-  countdown: $('countdown'),
-  countdownLabel: $('countdown-label'),
-  setProgress: $('set-progress'),
-  repsProgress: $('reps-progress'),
-  ringFg: document.querySelector('.ring-fg-circle'),
-  btnPause: $('btn-pause'),
-  btnStop: $('btn-stop'),
-  saveHint: $('save-hint')
+  viewConfig: mustGet('view-config'),
+  viewTrain: mustGet('view-train'),
+  form: mustGet<HTMLFormElement>('config-form'),
+  stageLabel: mustGet('stage-label'),
+  countdown: mustGet('countdown'),
+  countdownLabel: mustGet('countdown-label'),
+  setProgress: mustGet('set-progress'),
+  repsProgress: mustGet('reps-progress'),
+  ringFg: mustQuery<SVGCircleElement>('.ring-fg-circle'),
+  btnPause: mustGet<HTMLButtonElement>('btn-pause'),
+  btnStop: mustGet<HTMLButtonElement>('btn-stop'),
+  saveHint: mustGet('save-hint')
 };
 
+// 当前配置的唯一内存副本；初值取 index.html 的初始值（与主进程 DEFAULT_CONFIG 一致）
+let config: TimerConfig = readConfigFromUI();
+
 // === 配置读写（UI ↔ 内存） ===
-function readConfigFromUI() {
-  const cfg = {};
+function readConfigFromUI(): TimerConfig {
+  const cfg = {} as TimerConfig;
   FIELDS.forEach(f => {
-    cfg[f.key] = parseInt($(`val-${f.key}`).textContent, 10);
+    cfg[f.key] = parseInt(mustGet(`val-${f.key}`).textContent ?? '', 10);
   });
   return cfg;
 }
 
-function fillUI(cfg) {
+function fillUI(cfg: TimerConfig): void {
   FIELDS.forEach(f => {
-    $(`val-${f.key}`).textContent = cfg[f.key];
+    mustGet(`val-${f.key}`).textContent = String(cfg[f.key]);
   });
   config = { ...cfg };
 }
 
 // 步进按钮处理
-function handleStep(field, delta) {
+function handleStep(field: string, delta: number): void {
   const def = FIELDS.find(f => f.key === field);
   if (!def) return;
-  let v = parseInt($(`val-${field}`).textContent, 10) + delta;
+  let v = parseInt(mustGet(`val-${field}`).textContent ?? '', 10) + delta;
   v = Math.max(def.min, Math.min(def.max, v));
-  $(`val-${field}`).textContent = v;
-  config[field] = v;
+  mustGet(`val-${field}`).textContent = String(v);
+  config[def.key] = v;
   scheduleSave();
 }
 
 // 自动保存（debounce 600ms）
-let saveTimer = null;
-function scheduleSave() {
-  if (saveTimer) clearTimeout(saveTimer);
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleSave(): void {
+  if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      await Storage.save(config);
+      await ConfigStore.save(config);
       showHint('配置已保存');
     } catch (e) {
       console.error('保存失败', e);
@@ -88,19 +100,19 @@ function scheduleSave() {
   }, 600);
 }
 
-function showHint(text) {
+function showHint(text: string): void {
   els.saveHint.textContent = text;
   setTimeout(() => { els.saveHint.textContent = ''; }, 1500);
 }
 
 // === 格式化：倒计时显示秒数（<10 补零），匹配超大字布局 ===
-function formatCountdown(sec) {
+function formatCountdown(sec: number): string {
   const s = Math.max(0, Math.ceil(sec));
   return s < 10 ? '0' + s : String(s);
 }
 
 // === 音效 ===
-function playSoundForState(state) {
+function playSoundForState(state: TimerState): void {
   switch (state) {
     case 'warmup':       audio.playWarmupStart(); break;
     case 'work':         audio.playWorkStart(); break;
@@ -112,17 +124,17 @@ function playSoundForState(state) {
 }
 
 // === 视图更新 ===
-function setTrainState(state) {
+function setTrainState(state: TimerState): void {
   ALL_STATES.forEach(s => els.viewTrain.classList.remove('state-' + s));
   els.viewTrain.classList.add('state-' + state);
 }
 
-function updateRing(state, remaining, total) {
+function updateRing(state: TimerState, remaining: number, total: number): void {
   const ratio = total > 0 ? remaining / total : 0;
-  els.ringFg.style.strokeDashoffset = RING_CIRCUMFERENCE * (1 - ratio);
+  els.ringFg.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - ratio));
 }
 
-function updateSetProgress(snap) {
+function updateSetProgress(snap: TimerSnapshot): void {
   if (!timer.config) { els.setProgress.textContent = ''; return; }
   switch (snap.state) {
     case 'warmup':
@@ -146,7 +158,7 @@ function updateSetProgress(snap) {
   }
 }
 
-function updateRepsProgress(snap) {
+function updateRepsProgress(snap: TimerSnapshot): void {
   if (!timer.config || !['work', 'rest', 'between_sets'].includes(snap.state)) {
     els.repsProgress.innerHTML = '';
     return;
@@ -163,7 +175,7 @@ function updateRepsProgress(snap) {
   els.repsProgress.innerHTML = html;
 }
 
-function resetTrainButtons() {
+function resetTrainButtons(): void {
   els.btnPause.style.display = '';
   els.btnPause.textContent = '暂停';
   els.btnPause.disabled = false;
@@ -171,12 +183,12 @@ function resetTrainButtons() {
   els.btnStop.classList.add('danger');
 }
 
-function showConfigView() {
+function showConfigView(): void {
   els.viewConfig.classList.remove('hidden');
   els.viewTrain.classList.add('hidden');
 }
 
-function showTrainView() {
+function showTrainView(): void {
   els.viewConfig.classList.add('hidden');
   els.viewTrain.classList.remove('hidden');
 }
@@ -217,11 +229,12 @@ timer.onStateChange((snap) => {
 
 // === 事件绑定 ===
 // 步进按钮
-document.querySelectorAll('.step-btn').forEach(btn => {
+document.querySelectorAll<HTMLButtonElement>('.step-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const row = btn.closest('.field-row');
-    const field = row.dataset.field;
-    const delta = parseInt(btn.dataset.delta, 10);
+    const row = btn.closest<HTMLElement>('.field-row');
+    const field = row?.dataset.field;
+    const delta = parseInt(btn.dataset.delta ?? '', 10);
+    if (!field || !Number.isFinite(delta)) return;
     handleStep(field, delta);
   });
 });
@@ -236,7 +249,7 @@ els.form.addEventListener('submit', async (e) => {
   }
   // 必须在用户交互的同步上下文中初始化 AudioContext
   await audio.ensureCtx();
-  await Storage.save(cfg);
+  await ConfigStore.save(cfg);
   config = { ...cfg };
   resetTrainButtons();
   showTrainView();
@@ -258,19 +271,20 @@ els.btnStop.addEventListener('click', () => {
 });
 
 // === 窗口控制（自定义标题栏，仅 Electron 环境） ===
-if (window.windowAPI) {
-  $('win-minimize').addEventListener('click', () => window.windowAPI.minimize());
-  $('win-maximize').addEventListener('click', () => window.windowAPI.maximizeToggle());
-  $('win-close').addEventListener('click', () => window.windowAPI.close());
+const winAPI = windowAPI;
+if (winAPI) {
+  mustGet('win-minimize').addEventListener('click', () => { void winAPI.minimize(); });
+  mustGet('win-maximize').addEventListener('click', () => { void winAPI.maximizeToggle(); });
+  mustGet('win-close').addEventListener('click', () => { void winAPI.close(); });
   // 最大化状态变化 → 切换最大化/还原图标
-  const icoMax = document.querySelector('.ico-max');
-  const icoRestore = document.querySelector('.ico-restore');
-  const syncMaxIcon = (isMax) => {
+  const icoMax = document.querySelector<HTMLElement>('.ico-max');
+  const icoRestore = document.querySelector<HTMLElement>('.ico-restore');
+  const syncMaxIcon = (isMax: boolean): void => {
     if (icoMax) icoMax.style.display = isMax ? 'none' : 'block';
     if (icoRestore) icoRestore.style.display = isMax ? 'block' : 'none';
   };
-  window.windowAPI.onMaximizeChange(syncMaxIcon);
-  window.windowAPI.isMaximized().then(syncMaxIcon);
+  winAPI.onMaximizeChange(syncMaxIcon);
+  void winAPI.isMaximized().then(syncMaxIcon);
 } else {
   // 非 Electron（移动端/浏览器）：隐藏桌面窗口标题栏
   document.querySelector('.titlebar')?.classList.add('hidden-titlebar');
@@ -279,8 +293,8 @@ if (window.windowAPI) {
 // === 初始化：加载本地配置并填充 UI ===
 (async () => {
   try {
-    const cfg = await Storage.load();
-    fillUI(cfg);
+    const cfg = await ConfigStore.load();
+    if (cfg) fillUI(cfg);
   } catch (e) {
     console.error('加载配置失败', e);
   }

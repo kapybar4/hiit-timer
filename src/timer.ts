@@ -12,9 +12,9 @@ const STATES = {
   BETWEEN_SETS: 'between_sets',
   STRETCH: 'stretch',
   DONE: 'done'
-};
+} as const;
 
-const STATE_LABELS = {
+const STATE_LABELS: Record<TimerState, string> = {
   idle: '准备',
   warmup: '热身',
   work: '锻炼',
@@ -25,23 +25,22 @@ const STATE_LABELS = {
 };
 
 class HiitTimer {
-  constructor() {
-    this.state = STATES.IDLE;
-    this.config = null;
-    this.setIndex = 0;   // 当前组（1-based）
-    this.repIndex = 0;   // 当前组内次数（1-based）
-    this.remainingSec = 0;
-    this.totalSec = 0;
-    this.paused = false;
-    this.intervalId = null;
-    this.tickCallbacks = [];
-    this.stateCallbacks = [];
-  }
+  state: TimerState = STATES.IDLE;
+  config: TimerConfig | null = null;
+  setIndex = 0;   // 当前组（1-based）
+  repIndex = 0;   // 当前组内次数（1-based）
+  remainingSec = 0;
+  totalSec = 0;
+  paused = false;
 
-  onTick(cb) { this.tickCallbacks.push(cb); }
-  onStateChange(cb) { this.stateCallbacks.push(cb); }
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private tickCallbacks: Array<(snap: TimerSnapshot) => void> = [];
+  private stateCallbacks: Array<(snap: TimerSnapshot, prevState: TimerState) => void> = [];
 
-  snapshot() {
+  onTick(cb: (snap: TimerSnapshot) => void): void { this.tickCallbacks.push(cb); }
+  onStateChange(cb: (snap: TimerSnapshot, prevState: TimerState) => void): void { this.stateCallbacks.push(cb); }
+
+  snapshot(): TimerSnapshot {
     return {
       state: this.state,
       setIndex: this.setIndex,
@@ -52,17 +51,17 @@ class HiitTimer {
     };
   }
 
-  _emitTick() {
+  private _emitTick(): void {
     const snap = this.snapshot();
     this.tickCallbacks.forEach(cb => cb(snap));
   }
 
-  _emitStateChange(prevState) {
+  private _emitStateChange(prevState: TimerState): void {
     const snap = this.snapshot();
     this.stateCallbacks.forEach(cb => cb(snap, prevState));
   }
 
-  start(config) {
+  start(config: TimerConfig): void {
     this._clearInterval();
     this.config = { ...config };
     this.setIndex = 0;
@@ -71,7 +70,7 @@ class HiitTimer {
     this._enterState(STATES.WARMUP);
   }
 
-  pause() {
+  pause(): void {
     if (this.state === STATES.IDLE || this.state === STATES.DONE) return;
     if (this.paused) return;
     this.paused = true;
@@ -79,14 +78,14 @@ class HiitTimer {
     this._emitTick();
   }
 
-  resume() {
+  resume(): void {
     if (!this.paused) return;
     this.paused = false;
     this._startTicking();
     this._emitTick();
   }
 
-  stop() {
+  stop(): void {
     if (this.state === STATES.IDLE) return;
     this._clearInterval();
     const prev = this.state;
@@ -99,20 +98,22 @@ class HiitTimer {
     this._emitStateChange(prev);
   }
 
-  _clearInterval() {
-    if (this.intervalId) {
+  private _clearInterval(): void {
+    if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
   }
 
-  _startTicking() {
+  private _startTicking(): void {
     this._clearInterval();
     this.intervalId = setInterval(() => this._tick(), 1000);
   }
 
   // 进入新状态：设置该状态时长、emit 事件、（非终态）启动 tick
-  _enterState(newState) {
+  private _enterState(newState: TimerState): void {
+    // 不变量：状态推进会由 start() 或其后续的 tick 触发，此处 config 必定已设置
+    const cfg = this.config!;
     const prev = this.state;
     this.state = newState;
 
@@ -121,24 +122,24 @@ class HiitTimer {
         // 热身时预置第一组第一次的索引（UI 在 WARMUP 时不显示组次）
         this.setIndex = 1;
         this.repIndex = 1;
-        this.remainingSec = this.config.warmup;
-        this.totalSec = this.config.warmup;
+        this.remainingSec = cfg.warmup;
+        this.totalSec = cfg.warmup;
         break;
       case STATES.WORK:
-        this.remainingSec = this.config.work;
-        this.totalSec = this.config.work;
+        this.remainingSec = cfg.work;
+        this.totalSec = cfg.work;
         break;
       case STATES.REST:
-        this.remainingSec = this.config.rest;
-        this.totalSec = this.config.rest;
+        this.remainingSec = cfg.rest;
+        this.totalSec = cfg.rest;
         break;
       case STATES.BETWEEN_SETS:
-        this.remainingSec = this.config.betweenSets;
-        this.totalSec = this.config.betweenSets;
+        this.remainingSec = cfg.betweenSets;
+        this.totalSec = cfg.betweenSets;
         break;
       case STATES.STRETCH:
-        this.remainingSec = this.config.stretch;
-        this.totalSec = this.config.stretch;
+        this.remainingSec = cfg.stretch;
+        this.totalSec = cfg.stretch;
         break;
       case STATES.DONE:
         this.remainingSec = 0;
@@ -155,7 +156,7 @@ class HiitTimer {
     }
   }
 
-  _tick() {
+  private _tick(): void {
     if (this.paused) return;
     // 上次已归零并显示了 0：现在推进到下一状态
     if (this.remainingSec <= 0) {
@@ -167,8 +168,9 @@ class HiitTimer {
   }
 
   // 阶段倒计时归零后的状态推进
-  _advance() {
+  private _advance(): void {
     const s = this.state;
+    const cfg = this.config!;
 
     if (s === STATES.WARMUP) {
       this._enterState(STATES.WORK);
@@ -176,9 +178,9 @@ class HiitTimer {
     }
 
     if (s === STATES.WORK) {
-      if (this.repIndex >= this.config.repsPerSet) {
+      if (this.repIndex >= cfg.repsPerSet) {
         // 当前组所有次数完成
-        if (this.setIndex >= this.config.sets) {
+        if (this.setIndex >= cfg.sets) {
           // 最后一组完成 -> 拉伸
           this._enterState(STATES.STRETCH);
         } else {
