@@ -1,0 +1,21 @@
+{
+  // Web 核心（src/）：平台无关，被 Electron 与 Capacitor 共用。
+  // 产物 .js 就地回写到 src/，因此 index.html 的 <script src> 与 Capacitor 的 webDir 都无需改动。
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+
+    // 源码无 import/export，全部按「经典脚本」编译，全局作用域共享与迁移前一致
+    "module": "preserve",
+    "moduleResolution": "bundler",
+
+    // 显式清空 types：Web 核心绝不允许看到 Node 全局（架构边界，见 AGENTS.md）
+    "types": [],
+
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true
+  },
+  "include": ["src/**/*.ts", "types/**/*.d.ts"]
+}

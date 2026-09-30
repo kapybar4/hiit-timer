@@ -15,7 +15,7 @@ else
 	endif
 endif
 
-.PHONY: help install install-mobile start \
+.PHONY: build help install install-mobile start \
         dist-windows dist-macos \
         dist-android dist-iphone dist-ipad dist-ios-base \
         dist-desktop clean
@@ -25,7 +25,8 @@ help:
 	@echo "兼容性：仅支持各平台最新系统版本"
 	@echo ""
 	@echo "开发运行:"
-	@echo "  make start              启动 Electron 桌面应用"
+	@echo "  make start              启动 Electron 桌面应用（自动编译 TypeScript）"
+	@echo "  make build              仅编译 TypeScript（src/ 与 electron/）"
 	@echo "  make install            安装桌面端依赖（Node >=20）"
 	@echo "  make install-mobile     安装移动端依赖（Capacitor 7）"
 	@echo ""
@@ -45,6 +46,10 @@ install:
 
 install-mobile:
 	cd capacitor && $(NPM) install
+
+# TypeScript → JavaScript（原地回写 src/ 与 electron/）
+build:
+	$(NPM) run build
 
 start:
 	$(NPM) start
@@ -71,6 +76,7 @@ endif
 # Android：minSdk 34 (Android 14) / targetSdk 35 (Android 15)
 dist-android:
 	@command -v java >/dev/null 2>&1 || { echo "错误: 需要 JDK 17 + Android SDK (API 35)"; exit 1; }
+	$(NPM) run build
 	cd capacitor && npx cap sync android
 	cd capacitor && npx cap build android
 	@echo ""
@@ -81,6 +87,7 @@ dist-android:
 dist-ios-base:
 	@if [ "$(PLATFORM)" != "macos" ]; then echo "错误: iOS 构建需要 macOS 14+ + Xcode 16+"; exit 1; fi
 	@command -v xcodebuild >/dev/null 2>&1 || { echo "错误: 需要 Xcode 16+"; exit 1; }
+	$(NPM) run build
 	cd capacitor && npx cap sync ios
 	cd capacitor && npx cap build ios
 	@echo ""

@@ -7,9 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "electron electron/main.js",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac"
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.electron.json --noEmit",
+    "start": "npm run build && electron electron/main.js",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
   "author": "",
   "license": "MIT",
@@ -19,9 +21,14 @@
     "directories": {
       "output": "dist"
     },
+    "electronDownload": {
+      "mirror": "https://npmmirror.com/mirrors/electron/"
+    },
     "files": [
       "electron/**/*",
       "src/**/*",
+      "!electron/**/*.ts",
+      "!src/**/*.ts",
       "build/icon.ico"
     ],
     "electronLanguages": [
@@ -55,6 +62,7 @@
   },
   "devDependencies": {
     "electron": "^44.5.1",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
   }
 }

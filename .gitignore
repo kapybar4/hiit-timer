@@ -10,6 +10,10 @@ dist/
 *.app
 *.blockmap
 
+# TypeScript 编译产物（源码为同名 .ts，由 npm run build 生成）
+/src/*.js
+/electron/*.js
+
 # Electron 二进制缓存
 .electron-cache/
 
