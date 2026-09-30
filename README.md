@@ -1,203 +1,201 @@
-# HIIT Timer
+# HIIT 计时器
 
-English | [简体中文](README.zh-CN.md)
+跨平台高强度间歇训练（HIIT）计时器，支持 **Windows / macOS / Android / iPhone / iPad**，各平台共享同一套 UI 与核心逻辑。源码使用 **TypeScript** 编写并编译为原生 JavaScript。桌面端基于 **Electron 44**，移动端基于 **Capacitor 7**。
 
-A cross-platform High-Intensity Interval Training (HIIT) timer for **Windows / macOS / Android / iPhone / iPad**, sharing a single UI and core logic across all platforms. Written in **TypeScript**, compiled to plain JavaScript. Built with **Electron 44** on desktop and **Capacitor 7** on mobile.
-
-> The app UI is in Chinese; stage names carry English sub-labels such as `WORK` / `REST`.
+> 界面语言为中文；阶段名称同时带有 `WORK` / `REST` 等英文副标签。
 >
-> **Compatibility policy**: each platform only supports its latest OS version. No legacy fallbacks, to keep maintenance and testing cost low.
+> **兼容性策略**：各平台仅兼容最新系统版本，不做旧版本降级适配，以降低维护与测试成本。
 
-## Overview
+## 项目概述
 
-HIIT Timer guides you through a complete interval-training session with sound cues: **Warm-up → [Work ⇄ Rest] × reps × sets → Between-sets break → Stretch → Done**. All timing parameters are configured once and persisted locally, so the app is ready to use on every launch.
+HIIT 计时器通过音效引导你完成一整套间歇训练流程：**热身 → [锻炼 ⇄ 休息] × 次数 × 组数 → 组间间隔 → … → 拉伸 → 完成**。所有时间参数只需配置一次并本地持久化，之后开箱即用。
 
 | | |
 |---|---|
-| Desktop runtime | Electron 44 (`electron` 44.x, `electron-builder` 26.x) |
-| Mobile runtime | Capacitor 7 (Android / iOS / iPadOS), reusing the same `src/` web core |
-| Language | TypeScript 7, compiled by `tsc` alone — no framework, no bundler |
-| UI | Plain HTML + CSS + JavaScript (emitted from TypeScript) |
-| Sound | Web Audio API, synthesized at runtime (5 distinct timbres, no audio files) |
-| Storage | Local JSON in the Electron `userData` directory / native KV on mobile / `localStorage` in the browser |
+| 桌面端运行时 | Electron 44（`electron` 44.x、`electron-builder` 26.x） |
+| 移动端运行时 | Capacitor 7（Android / iOS / iPadOS），复用同一套 `src/` Web 核心 |
+| 开发语言 | TypeScript 7，仅由 `tsc` 编译——不引入框架，也不引入打包器 |
+| UI | 原生 HTML + CSS + JavaScript（由 TypeScript 编译产出） |
+| 音效 | Web Audio API 运行时合成（5 种可区分音色，无音频文件） |
+| 存储 | Electron `userData` 目录下的本地 JSON / 移动端原生 KV / 浏览器 `localStorage` |
 
-## Interface
+## 界面说明
 
-The desktop app is a single 440 × 820 frameless window with a custom title bar (drag area plus minimize / maximize / close buttons) and two views that share one dark theme:
+桌面端为单个 440 × 820 无边框窗口，带自定义标题栏（拖拽区 + 最小化 / 最大化 / 关闭按钮），两个视图共用同一套暗色主题：
 
-**Configuration view**
+**配置视图**
 
-- Header: the "HIIT" wordmark with the subtitle "高强度间歇训练".
-- Card "时间配置 · 秒" (times, in seconds): five stepper rows — warm-up, work, rest, between-sets, stretch — each with `−` / `+` buttons and the current value in between.
-- Card "训练结构" (structure): stepper rows for sets and reps per set.
-- A transient "配置已保存" (configuration saved) hint, plus a full-width "开始训练" (start training) button.
+- 顶部：`HIIT` 字标与副标题「高强度间歇训练」。
+- 「时间配置 · 秒」卡片：热身、单次锻炼、单次休息、组间间隔、拉伸五行，每行由 `−` / `+` 步进按钮与中间当前数值组成。
+- 「训练结构」卡片：组数、每组次数两行步进器。
+- 底部：「配置已保存」临时提示（自动保存反馈）与整宽「开始训练」按钮。
 
-**Training view**
+**训练视图**
 
-- A stage-colored accent bar across the top of the window and the stage name in large type (热身 / 锻炼 / 休息 / 组间间隔 / 拉伸 / 完成).
-- A set/rep progress line (e.g. "组 1 / 4 · 次 1 / 8") and a row of rep dots that fill as reps complete.
-- A 280 px circular progress ring around an oversized countdown (seconds, zero-padded), with an English sub-label (WARM UP / WORK / REST / BREAK / STRETCH / DONE) below the number.
-- Bottom actions: 暂停 / 继续 (pause / resume) and 停止 (stop). In the done state the countdown area shows a check mark and the only action is 返回配置 (back to configuration).
+- 窗口顶部为随阶段变色的强调条，下方以大字显示当前阶段名（热身 / 锻炼 / 休息 / 组间间隔 / 拉伸 / 完成）。
+- 组次进度行（如「组 1 / 4 · 次 1 / 8」）与一排随完成次数点亮的进度点。
+- 280px 环形进度条围绕超大倒计时数字（秒，不足两位补零），数字下方是英文副标签（WARM UP / WORK / REST / BREAK / STRETCH / DONE）。
+- 底部操作：暂停 / 继续、停止；进入完成态后倒计时区域显示对勾，仅保留「返回配置」按钮。
 
-Stage color coding: warm-up / stretch amber, work green, rest blue, between-sets violet, done gold — each stage also has its own sound cue.
+阶段色彩编码：热身 / 拉伸为琥珀色、锻炼为绿色、休息为蓝色、组间间隔为紫色、完成为金色，每个阶段还配有独立音效。
 
-## Features
+## 功能说明
 
-- **Full stage flow**: Warm-up → [Work ⇄ Rest] × N reps × M sets → Between-sets break → … → Stretch → Done (the last set goes straight to stretch, skipping the break).
-- **Distinct sound per stage**, synthesized with the Web Audio API — 5 clearly distinguishable cues, zero audio assets:
-  - Warm-up / Stretch start: 523 Hz long beep (1.2 s)
-  - Work start: 880 Hz double short beep
-  - Rest start: 440 Hz single short beep
-  - Between-sets start: 440 → 660 Hz pitch slide
-  - Done: three ascending notes (523 → 659 → 784 Hz)
-- **Local persistence**: one configuration, auto-saved (debounced) after every stepper adjustment; no re-configuring after restart.
-- **Purpose-built UI**: stage color coding, oversized countdown, circular progress ring, set/rep progress dots, custom frameless title bar with window controls.
-- **Pause / resume / stop** at any time; the timer state machine is pure logic with zero DOM dependency.
-- **Fully typed**: the whole codebase is TypeScript under `strict`, with the cross-process config contract defined once in `types/contract.d.ts`.
+- **完整阶段流程**：热身 → [锻炼 ⇄ 休息] × N 次 × M 组 → 组间间隔 → … → 拉伸 → 完成（最后一组结束后直接进入拉伸，不再进入组间间隔）。
+- **各阶段独立音效**，由 Web Audio API 程序生成，5 种音色清晰可辨，零音频资源：
+  - 热身 / 拉伸开始：523 Hz 长鸣（1.2 s）
+  - 锻炼开始：880 Hz 双短鸣
+  - 休息开始：440 Hz 单短鸣
+  - 组间间隔开始：440 → 660 Hz 渐变
+  - 流程结束：三连升调（523 → 659 → 784 Hz）
+- **本地持久化**：仅保存一份配置，每次步进调整后 debounce 自动保存，重启后无需重新配置。
+- **专用界面设计**：阶段色彩编码、超大倒计时、环形进度条、组次进度点、无边框自定义标题栏与窗口控制。
+- **随时暂停 / 继续 / 停止**；计时器状态机为纯逻辑实现，不依赖 DOM。
+- **全量类型覆盖**：全部代码以 TypeScript 在 `strict` 下编写，跨进程的配置契约在 `types/contract.d.ts` 中统一定义一次。
 
-## Requirements
+## 环境要求
 
-| Target | Requirements |
+| 目标平台 | 要求 |
 |---|---|
-| Windows desktop | Windows 11, Node.js ≥ 20 |
-| macOS desktop | macOS 14 (Sonoma) or later, Node.js ≥ 20 |
-| Android | Android 14 (API 34) or later, JDK 17, Android SDK (API 35) |
-| iPhone / iPad | iOS / iPadOS 17 or later, macOS 14+ with Xcode 16+, CocoaPods |
+| Windows 桌面 | Windows 11、Node.js ≥ 20 |
+| macOS 桌面 | macOS 14 (Sonoma) 及以上、Node.js ≥ 20 |
+| Android | Android 14 (API 34) 及以上、JDK 17、Android SDK（API 35） |
+| iPhone / iPad | iOS / iPadOS 17 及以上、macOS 14+ 与 Xcode 16+、CocoaPods |
 
-## Installation
+## 安装指南
 
 ```bash
-git clone <repository-url>
+git clone <仓库地址>
 cd Timer
 
-# Desktop dependencies (Electron 44 + electron-builder 26 + TypeScript 7)
+# 桌面端依赖（Electron 44 + electron-builder 26 + TypeScript 7）
 npm install
 
-# Mobile dependencies (Capacitor 7) — only needed for Android / iOS
+# 移动端依赖（Capacitor 7）——仅 Android / iOS 需要
 cd capacitor && npm install && cd ..
 ```
 
-> **Mainland China network**: both mirrors are already pinned in this repository — `.npmrc` for the npm registry and `build.electronDownload` in `package.json` for the Electron binary — so `npm install` and packaging need no extra setup.
+> **国内网络环境**：两个镜像均已固化在仓库中——`.npmrc` 固定 npm registry，`package.json` 的 `build.electronDownload` 固定 Electron 二进制镜像，因此 `npm install` 与打包都无需额外配置。
 
-First-time mobile setup (generates the native projects):
+移动端首次初始化（生成原生工程）：
 
 ```bash
 cd capacitor
-npx cap add android   # then verify minSdkVersion 34 / targetSdkVersion 35 in android/build.gradle
-npx cap add ios       # then verify platform :ios, '17.0' in ios/App/Podfile
+npx cap add android   # 之后在 android/build.gradle 确认 minSdkVersion 34 / targetSdkVersion 35
+npx cap add ios       # 之后在 ios/App/Podfile 确认 platform :ios, '17.0'
 ```
 
-## Development
+## 开发说明
 
-The `.ts` files are the sources; the `.js` files next to them are build output and are gitignored. `src/index.html` and `capacitor.config.json` reference the emitted `.js` names, so the compiled files must always sit next to their sources — `tsc` is configured to do that.
+`.ts` 是源码，与它同名的 `.js` 是编译产物且已加入 `.gitignore`。`src/index.html` 与 `capacitor.config.json` 都引用编译后的 `.js` 文件名，因此产物必须与源码同目录——`tsconfig` 已按此配置。
 
 ```bash
-npm run build       # compile src/ and electron/ in place
-npm run typecheck   # type-check only (--noEmit), both projects
-npm start           # build, then launch the Electron app
+npm run build       # 就地编译 src/ 与 electron/
+npm run typecheck   # 仅类型检查（--noEmit），两个工程都跑
+npm start           # 先编译，再启动 Electron 应用
 ```
 
-`npm start` and every `dist:*` target compile first, so you rarely need to run `npm run build` by hand. The web core (`src/`) deliberately stays on **classic scripts** — Electron loads `index.html` over `file://`, where Chromium blocks ES modules — so the files share state through the global scope rather than `import`/`export`.
+`npm start` 与所有 `dist:*` 目标都会先编译，因此通常无需手动执行 `npm run build`。Web 核心（`src/`）刻意保持**经典脚本**形态——Electron 通过 `file://` 加载 `index.html`，而 Chromium 在 `file://` 下会拦截 ES Module——因此这些文件通过全局作用域而非 `import` / `export` 共享状态。
 
-## Usage
+## 使用方法
 
-1. **Launch**: `npm start` (or `make start`) — this compiles the TypeScript first.
-2. **Configure**: adjust each parameter with the `−` / `+` steppers. All values are seconds except *Sets* and *Reps per set*. Changes are saved automatically (a "配置已保存" hint appears).
-3. **Train**: click **开始训练**. The app plays the warm-up cue and walks through the whole flow, announcing each stage with its own sound.
-4. **Control**: **暂停 / 继续** freezes and resumes the countdown; **停止** returns to the configuration view.
-5. **Window**: drag the custom title bar to move the window; use the top-right buttons to minimize / maximize / close.
+1. **启动**：`npm start`（或 `make start`），该命令会先编译 TypeScript。
+2. **配置**：用 `−` / `+` 步进按钮调整各参数，除「组数」「每组次数」外均为秒数；修改后自动保存（界面出现「配置已保存」提示）。
+3. **开始训练**：点击 **开始训练**，应用播放热身提示音并依次走完整个流程，每个阶段都有独立音效提示。
+4. **过程控制**：**暂停 / 继续** 冻结并恢复倒计时；**停止** 返回配置视图。
+5. **窗口操作**：拖动自定义标题栏移动窗口，右上角按钮可最小化 / 最大化 / 关闭。
 
-Default configuration:
+默认配置：
 
-| Parameter | Default | Unit |
+| 参数 | 默认值 | 单位 |
 |---|---|---|
-| Warm-up | 60 | s |
-| Work | 20 | s |
-| Rest | 10 | s |
-| Between sets | 30 | s |
-| Stretch | 90 | s |
-| Sets | 4 | — |
-| Reps per set | 8 | — |
+| 热身 | 60 | 秒 |
+| 单次锻炼 | 20 | 秒 |
+| 单次休息 | 10 | 秒 |
+| 组间间隔 | 30 | 秒 |
+| 拉伸 | 90 | 秒 |
+| 组数 | 4 | — |
+| 每组次数 | 8 | — |
 
-## Building Distribution Packages
+## 构建部署包
 
 ```bash
-make start           # development run (desktop)
-make build           # compile TypeScript only
-make dist-windows    # Windows .exe (NSIS installer, requires Windows 11)
-make dist-macos      # macOS .dmg (must build on macOS 14+)
-make dist-android    # Android .apk (minSdk 34 / targetSdk 35)
-make dist-iphone     # iPhone (requires macOS + Xcode)
-make dist-ipad       # iPad (requires macOS + Xcode)
-make dist-desktop    # desktop package for the current host platform
-make clean           # remove build artifacts
+make start           # 开发运行（桌面）
+make build           # 仅编译 TypeScript
+make dist-windows    # Windows .exe（NSIS 安装包，需 Windows 11）
+make dist-macos      # macOS .dmg（须在 macOS 14+ 上执行）
+make dist-android    # Android .apk（minSdk 34 / targetSdk 35）
+make dist-iphone     # iPhone（须在 macOS + Xcode 环境执行）
+make dist-ipad       # iPad（须在 macOS + Xcode 环境执行）
+make dist-desktop    # 当前宿主平台对应的桌面包
+make clean           # 清理构建产物
 ```
 
-> Windows users need `make` (via Git Bash or `choco install make`).
+> **Windows 用户**：需先安装 `make`（可通过 Git Bash 或 `choco install make`）。
 
-| Platform | Artifact |
+| 平台 | 产物 |
 |---|---|
 | Windows | `dist/HIIT-Timer-1.0.0-setup.exe` |
 | macOS | `dist/HIIT-Timer-1.0.0-mac.dmg` |
 | Android | `capacitor/android/app/build/outputs/apk/release/app-release.apk` |
 | iPhone / iPad | Xcode Archive → Export `.ipa` |
 
-## FAQ
+## 常见问题解答
 
-**Where is my configuration stored? How do I reset it?**
-On desktop it is a single JSON file in the Electron `userData` directory:
-- Windows: `%APPDATA%\hiit-timer\config.json`
-- macOS: `~/Library/Application Support/hiit-timer/config.json`
+**配置保存在哪里？如何重置？**
+桌面端保存为 Electron `userData` 目录下的单个 JSON 文件：
+- Windows：`%APPDATA%\hiit-timer\config.json`
+- macOS：`~/Library/Application Support/hiit-timer/config.json`
 
-Delete the file (or set the values back manually) to restore the defaults. Unknown or newly added fields fall back to defaults automatically, so the file stays forward-compatible.
+删除该文件（或手动改回默认值）即可恢复默认配置。文件中未知或新增字段会自动回退到默认值，因此版本升级后依然兼容。
 
-**I edited a `.ts` file but the app did not change.**
-The `.js` files are compiled output. Run `npm run build`, or just use `npm start` / `make start`, which compile first. Never edit the generated `.js` by hand — the next build overwrites it.
+**我改了 `.ts` 文件，但应用行为没变化？**
+`.js` 是编译产物。请执行 `npm run build`，或直接使用 `npm start` / `make start`（二者都会先编译）。不要手工编辑生成的 `.js`，下一次构建会覆盖它。
 
-**The timer is silent. What should I check?**
-The audio context is initialized by the first click on **开始训练** (browser autoplay policy), so make sure you start the session from the UI. Also check the system volume and the selected output device. No audio files are shipped — all cues are synthesized, so a muted system or a deleted asset cannot be the cause.
+**没有声音怎么办？**
+音频上下文由首次点击「开始训练」时初始化（浏览器自动播放策略限制），请务必从界面启动训练；同时检查系统音量与输出设备。应用不附带任何音频文件，所有提示音均为实时合成，因此不存在资源缺失问题。
 
-**Do I need to re-enter the configuration every time?**
-No. Adjustments are saved (debounced) after every stepper click, and the last configuration is loaded at startup.
+**每次都要重新填写配置吗？**
+不需要。每次步进调整后都会自动保存，启动时自动加载上一次的配置。
 
-**Why are only the latest OS versions supported?**
-This is a deliberate policy: supporting legacy systems multiplies the testing matrix and maintenance cost while adding little value. See the requirements table above.
+**为什么只支持各平台最新系统版本？**
+这是刻意的取舍：兼容旧系统会成倍放大测试矩阵与维护成本，而收益有限。具体要求见上方环境要求表格。
 
-**Can I build the macOS package on Windows (or vice versa)?**
-No. The `.dmg` must be built on macOS, and the iOS/Xcode part requires macOS with Xcode. On Windows you can build the Windows NSIS installer; the same is true for the mobile targets on their respective toolchains.
+**可以在 Windows 上构建 macOS 包（或反向）吗？**
+不可以。`.dmg` 必须在 macOS 上构建，iOS 部分同样依赖 macOS + Xcode；Windows 上可构建 Windows NSIS 安装包，各移动平台需使用对应工具链构建。
 
-**Packaging fails with `EBUSY: resource busy or locked ... app.asar` on Windows.**
-Another process is holding the output directory — usually a running instance of the app/packager, or a second build running concurrently in the same folder. Close running instances, make sure only one build runs at a time, then clean the output directory and retry.
+**Windows 打包报 `EBUSY: resource busy or locked ... app.asar` 怎么办？**
+说明输出目录被其他进程占用：通常是应用或打包进程仍在运行，或同一目录下有第二个构建在并发执行。请关闭正在运行的实例与并发构建，清理输出目录后重试。
 
-**Does the app need a network connection?**
-No. Everything — UI, timer logic, sound synthesis, configuration — is local.
+**应用需要联网吗？**
+不需要。界面、计时逻辑、音效合成与配置存储全部在本地完成。
 
-## Project Structure
+## 项目结构
 
 ```
-src/                  # Shared web core (platform-agnostic, used by Electron & Capacitor)
-├─ index.html         # UI structure
-├─ styles.css         # v2 design system (dark theme / stage colors / oversized countdown)
-├─ globals.d.ts       # Web-core globals + host-injected bridges
-├─ timer.ts           # Timer state machine (pure logic, no DOM dependency)
-├─ audio.ts           # Web Audio sound synthesis (no audio files)
-├─ storage.ts         # Cross-platform storage adapter (exports ConfigStore)
-└─ renderer.ts        # UI interaction logic
+src/                  # 共享 Web 核心（平台无关，Electron 与 Capacitor 共用）
+├─ index.html         # UI 结构
+├─ styles.css         # v2 设计系统（暗色主题 / 阶段色彩 / 超大倒计时）
+├─ globals.d.ts       # Web 核心全局声明 + 宿主注入的桥接对象
+├─ timer.ts           # 计时器状态机（纯逻辑，无 DOM 依赖）
+├─ audio.ts           # Web Audio 音效合成（无音频文件依赖）
+├─ storage.ts         # 跨平台存储适配层（导出 ConfigStore）
+└─ renderer.ts        # UI 交互逻辑
 
-electron/             # Desktop shell (Electron 44)
-├─ main.ts            # Main process, window creation + config IPC (userData/config.json)
-└─ preload.ts         # contextBridge exposing timerAPI / windowAPI
+electron/             # 桌面壳（Electron 44）
+├─ main.ts            # 主进程：窗口创建 + 配置 IPC（userData/config.json）
+└─ preload.ts         # contextBridge 暴露 timerAPI / windowAPI
 
-types/                # contract.d.ts — types shared by both TS projects
-tsconfig.json         # Web-core project (DOM libs, emits .js in place)
-tsconfig.electron.json# Electron-host project (Node types, emits .js in place)
-capacitor/            # Mobile shell (Capacitor 7, webDir → ../src)
-Makefile              # Unified build entry point (5 platforms)
-AGENTS.md             # Guide for AI coding agents (docs/verification/commit rules)
+types/                # contract.d.ts —— 两个 TS 工程共享的类型契约
+tsconfig.json         # Web 核心工程（DOM 类型库，产物就地生成）
+tsconfig.electron.json# Electron 宿主工程（Node 类型，产物就地生成）
+capacitor/            # 移动壳（Capacitor 7，webDir → ../src）
+Makefile              # 统一构建入口（5 个平台）
+AGENTS.md             # AI 编码代理指南（文档 / 验证 / 提交规范）
 ```
 
-Compiled `.js` files appear next to their `.ts` sources and are gitignored.
+编译出的 `.js` 与同名 `.ts` 位于同一目录，且已加入 `.gitignore`。
 
-## License
+## 许可证
 
 [MIT](LICENSE)

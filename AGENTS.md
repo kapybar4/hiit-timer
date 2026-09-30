@@ -63,8 +63,8 @@ Mainland China network: the npm registry is already pinned to npmmirror in `.npm
 
 ## Documentation Rules (MUST)
 
-1. **After any change, refresh all three documents in the same change**: `AGENTS.md`, `README.md` (English), and `README.zh-CN.md` (Chinese).
-2. The two READMEs must stay **in sync** — same sections, same facts, mirrored language. `README.md` is the default entry; both must link to each other at the top.
+1. **After any change, refresh `AGENTS.md` and `README.md` in the same change.**
+2. **`README.md` is the single README and is written in Chinese** — the project's documentation language. Do not add a separate English README or any second language variant.
 3. **Documentation must not embed images.** Describe the UI, flows, and behavior in text instead (the previous screenshots were removed on purpose — privacy and maintenance reasons).
 4. Keep version numbers, commands, file paths, and artifact names in the docs accurate; verify them against the code before writing.
 
