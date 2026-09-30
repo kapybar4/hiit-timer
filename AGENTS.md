@@ -17,7 +17,7 @@ HIIT Timer is a cross-platform High-Intensity Interval Training timer. One platf
 | `tsconfig.electron.json` | Electron host project: Node types, `module: nodenext`, emits `.js` next to the `.ts` |
 | `capacitor/` | Mobile shell config (`webDir` → `../src`); native projects are generated locally and gitignored |
 | `build/` | App icons (`icon.ico` used by the packager, `icon.png` source for `scripts/generate-icon.ps1`) |
-| `design/` | Design mockups; `design/verify*.js` are local-only verification scripts (gitignored) |
+| `design/` | Local-only verification scripts (`design/verify*.js`, gitignored). The repository intentionally ships **no design mockups, images, or HTML prototypes** |
 | `Makefile` | Unified build entry point for all five platforms |
 
 ## Stack & Constraints
@@ -90,6 +90,6 @@ Before considering a change complete:
 ## Privacy & Security Rules
 
 - Never commit secrets, tokens, credentials, personal emails, machine names, or absolute local paths (`C:\Users\...`, `/Users/...`). Keep the repo free of environment-specific data.
-- Do not add screenshots or images to the documentation (see Documentation Rules).
+- Keep the repository free of images, HTML prototypes, and other visual/binary assets. The only image assets are the application icons in `build/`, and `src/index.html` is the app UI itself (inline SVG icons only). Do not add screenshots to the documentation (see Documentation Rules).
 - Sample commands and paths in docs must be generic (`<repository-url>`, `%APPDATA%`, `~/Library/...`).
 - The app stores user data only in the platform-standard locations listed in the READMEs; do not add telemetry, analytics, or network calls without explicit user approval.
