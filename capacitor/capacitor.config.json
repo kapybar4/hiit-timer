@@ -1,0 +1,11 @@
+{
+  "appId": "com.hiit.timer",
+  "appName": "HIIT Timer",
+  "webDir": "../src",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "Preferences": {}
+  }
+}

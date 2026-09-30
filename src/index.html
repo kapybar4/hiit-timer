@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';">
+  <title>HIIT 计时器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- 自定义标题栏（frameless window） -->
+  <header class="titlebar">
+    <div class="titlebar-drag">
+      <div class="titlebar-icon" aria-hidden="true"></div>
+      <span class="titlebar-title">HIIT 计时器</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" id="win-minimize" type="button" aria-label="最小化">
+        <svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 5 H10" stroke="currentColor" stroke-width="1"/></svg>
+      </button>
+      <button class="titlebar-btn" id="win-maximize" type="button" aria-label="最大化">
+        <svg class="ico-max" viewBox="0 0 10 10" width="10" height="10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        <svg class="ico-restore" viewBox="0 0 10 10" width="10" height="10"><rect x="2.5" y="0.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+      </button>
+      <button class="titlebar-btn titlebar-close" id="win-close" type="button" aria-label="关闭">
+        <svg viewBox="0 0 10 10" width="10" height="10"><path d="M0 0 L10 10 M10 0 L0 10" stroke="currentColor" stroke-width="1"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- 配置视图 -->
+  <section id="view-config" class="view config-view">
+    <div class="app-title">
+      <h2>HIIT</h2>
+      <p>高强度间歇训练</p>
+    </div>
+
+    <form id="config-form" autocomplete="off">
+      <div class="config-card">
+        <div class="config-card-title">时间配置 · 秒</div>
+        <div class="field-row" data-field="warmup">
+          <span class="field-label">热身</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-5">−</button>
+            <span class="step-value" id="val-warmup">60</span>
+            <button type="button" class="step-btn" data-delta="5">+</button>
+          </div>
+        </div>
+        <div class="field-row" data-field="work">
+          <span class="field-label">单次锻炼</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-5">−</button>
+            <span class="step-value" id="val-work">20</span>
+            <button type="button" class="step-btn" data-delta="5">+</button>
+          </div>
+        </div>
+        <div class="field-row" data-field="rest">
+          <span class="field-label">单次休息</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-5">−</button>
+            <span class="step-value" id="val-rest">10</span>
+            <button type="button" class="step-btn" data-delta="5">+</button>
+          </div>
+        </div>
+        <div class="field-row" data-field="betweenSets">
+          <span class="field-label">组间间隔</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-5">−</button>
+            <span class="step-value" id="val-betweenSets">30</span>
+            <button type="button" class="step-btn" data-delta="5">+</button>
+          </div>
+        </div>
+        <div class="field-row" data-field="stretch">
+          <span class="field-label">拉伸</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-5">−</button>
+            <span class="step-value" id="val-stretch">90</span>
+            <button type="button" class="step-btn" data-delta="5">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-card">
+        <div class="config-card-title">训练结构</div>
+        <div class="field-row" data-field="sets">
+          <span class="field-label">组数</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-1">−</button>
+            <span class="step-value" id="val-sets">4</span>
+            <button type="button" class="step-btn" data-delta="1">+</button>
+          </div>
+        </div>
+        <div class="field-row" data-field="repsPerSet">
+          <span class="field-label">每组次数</span>
+          <div class="stepper">
+            <button type="button" class="step-btn" data-delta="-1">−</button>
+            <span class="step-value" id="val-repsPerSet">8</span>
+            <button type="button" class="step-btn" data-delta="1">+</button>
+          </div>
+        </div>
+      </div>
+
+      <p id="save-hint" class="hint" role="status" aria-live="polite"></p>
+      <button type="submit" class="start-btn">开始训练</button>
+    </form>
+  </section>
+
+  <!-- 训练视图 -->
+  <section id="view-train" class="view train-view state-idle hidden">
+    <div class="stage-bar"></div>
+    <div class="train-content">
+      <div class="train-top">
+        <div class="stage-name" id="stage-label">准备</div>
+        <div class="set-info" id="set-progress">&nbsp;</div>
+        <div class="reps-progress" id="reps-progress"></div>
+      </div>
+      <div class="ring-wrap">
+        <svg class="ring-svg" width="280" height="280" viewBox="0 0 280 280" aria-hidden="true">
+          <circle class="ring-bg-circle" cx="140" cy="140" r="128"></circle>
+          <circle class="ring-fg-circle" cx="140" cy="140" r="128"></circle>
+        </svg>
+        <div class="countdown-center">
+          <div class="countdown-num" id="countdown">00:00</div>
+          <div class="countdown-label" id="countdown-label">READY</div>
+        </div>
+      </div>
+      <div class="train-actions">
+        <button type="button" id="btn-pause" class="train-btn">暂停</button>
+        <button type="button" id="btn-stop" class="train-btn danger">停止</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="audio.js"></script>
+  <script src="timer.js"></script>
+  <script src="storage.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
