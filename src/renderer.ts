@@ -56,8 +56,14 @@ const els = {
   saveHint: mustGet('save-hint')
 };
 
-// 当前配置的唯一内存副本；初值取 index.html 的初始值（与主进程 DEFAULT_CONFIG 一致）
-let config: TimerConfig = readConfigFromUI();
+// 当前配置的内存副本。
+//
+// 初值刻意留空（与迁移前一致）：若在脚本加载期同步读取 DOM，config 会在
+// ConfigStore.load() 解析之前就带上默认值，实测会稳定触发保存丢失
+// （design/verify-e2e.js 的「步进操作自动保存」一项）。空对象最多让首次运行保存
+// 一份不完整的配置——主进程 writeConfig 只写已知的有限数值字段，readConfig 又会与
+// 默认值合并，因此这一情形是自愈的。
+let config = {} as TimerConfig;
 
 // === 配置读写（UI ↔ 内存） ===
 function readConfigFromUI(): TimerConfig {
